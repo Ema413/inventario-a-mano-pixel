@@ -3,16 +3,30 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { CloudOff, RefreshCw } from "lucide-react";
 import { getAccessStatus } from "@/lib/auth.functions";
-import { markGateConfirmed } from "@/lib/gate-cache";
+import { gateRecentlyConfirmed, markGateConfirmed, resetGateCache } from "@/lib/gate-cache";
 import { itemsQuery } from "@/lib/queries";
 import { FloatingNav } from "@/components/app/FloatingNav";
 import { BrandMark } from "@/components/app/BrandMark";
 
 export const Route = createFileRoute("/_gated")({
   beforeLoad: async () => {
-    const status = await getAccessStatus();
-    if (!status.unlocked) throw redirect({ to: "/acceso" });
-    markGateConfirmed();
+    if (gateRecentlyConfirmed()) {
+      return;
+    }
+    try {
+      const status = await getAccessStatus();
+      if (!status.unlocked) {
+        resetGateCache();
+        throw redirect({ to: "/acceso" });
+      }
+      markGateConfirmed();
+    } catch (err) {
+      if (err && typeof err === "object" && "to" in err) {
+        throw err;
+      }
+      resetGateCache();
+      throw redirect({ to: "/acceso" });
+    }
   },
   component: GatedLayout,
 });
